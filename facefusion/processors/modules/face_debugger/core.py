@@ -5,7 +5,7 @@ import numpy
 
 import facefusion.jobs.job_manager
 import facefusion.jobs.job_store
-from facefusion import config, content_analyser, face_classifier, face_detector, face_landmarker, face_masker, face_recognizer, logger, state_manager, translator, video_manager
+from facefusion import config, face_classifier, face_detector, face_landmarker, face_masker, face_recognizer, logger, state_manager, translator, video_manager
 from facefusion.face_analyser import scale_face
 from facefusion.face_helper import warp_face_by_face_landmark_5
 from facefusion.face_masker import create_area_mask, create_box_mask, create_occlusion_mask, create_region_mask
@@ -60,7 +60,6 @@ def post_process() -> None:
 	read_static_video_frame.cache_clear()
 	video_manager.clear_video_pool()
 	if state_manager.get_item('video_memory_strategy') == 'strict':
-		content_analyser.clear_inference_pool()
 		face_classifier.clear_inference_pool()
 		face_detector.clear_inference_pool()
 		face_landmarker.clear_inference_pool()

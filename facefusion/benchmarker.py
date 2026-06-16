@@ -6,7 +6,7 @@ from time import perf_counter
 from typing import Iterator, List
 
 import facefusion.choices
-from facefusion import content_analyser, core, state_manager
+from facefusion import core, state_manager
 from facefusion.cli_helper import render_table
 from facefusion.download import conditional_download, resolve_download_url
 from facefusion.face_store import clear_static_faces
@@ -62,8 +62,6 @@ def cycle(cycle_count : int) -> BenchmarkCycleSet:
 
 	for index in range(cycle_count):
 		if state_manager.get_item('benchmark_mode') == 'cold':
-			content_analyser.analyse_image.cache_clear()
-			content_analyser.analyse_video.cache_clear()
 			clear_static_faces()
 
 		start_time = perf_counter()

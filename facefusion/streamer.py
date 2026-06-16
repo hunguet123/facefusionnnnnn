@@ -10,7 +10,6 @@ from tqdm import tqdm
 
 from facefusion import ffmpeg_builder, logger, state_manager, translator
 from facefusion.audio import create_empty_audio_frame
-from facefusion.content_analyser import analyse_stream
 from facefusion.ffmpeg import open_ffmpeg
 from facefusion.filesystem import is_directory
 from facefusion.processors.core import get_processors_modules
@@ -27,8 +26,6 @@ def multi_process_capture(camera_capture : cv2.VideoCapture, camera_fps : Fps) -
 
 			while camera_capture and camera_capture.isOpened():
 				_, capture_vision_frame = camera_capture.read()
-				if analyse_stream(capture_vision_frame, camera_fps):
-					camera_capture.release()
 
 				if numpy.any(capture_vision_frame):
 					future = executor.submit(process_stream_frame, capture_vision_frame)

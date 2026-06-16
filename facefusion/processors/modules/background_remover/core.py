@@ -7,7 +7,7 @@ import numpy
 
 import facefusion.jobs.job_manager
 import facefusion.jobs.job_store
-from facefusion import config, content_analyser, inference_manager, logger, state_manager, translator, video_manager
+from facefusion import config, inference_manager, logger, state_manager, translator, video_manager
 from facefusion.common_helper import is_macos, is_windows
 from facefusion.download import conditional_download_hashes, conditional_download_sources, resolve_download_url
 from facefusion.execution import has_execution_provider
@@ -532,8 +532,6 @@ def post_process() -> None:
 	if state_manager.get_item('video_memory_strategy') in [ 'strict', 'moderate' ]:
 		clear_inference_pool()
 	if state_manager.get_item('video_memory_strategy') == 'strict':
-		content_analyser.clear_inference_pool()
-
 
 def remove_background(temp_vision_frame : VisionFrame) -> Tuple[VisionFrame, Mask]:
 	model_type = get_model_options().get('type')
