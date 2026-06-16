@@ -531,7 +531,7 @@ def post_process() -> None:
 	video_manager.clear_video_pool()
 	if state_manager.get_item('video_memory_strategy') in [ 'strict', 'moderate' ]:
 		clear_inference_pool()
-	if state_manager.get_item('video_memory_strategy') == 'strict':
+
 
 def remove_background(temp_vision_frame : VisionFrame) -> Tuple[VisionFrame, Mask]:
 	model_type = get_model_options().get('type')
