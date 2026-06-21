@@ -14,7 +14,7 @@ from facefusion.jobs.job_list import compose_job_list
 from facefusion.memory import limit_system_memory
 from facefusion.processors.core import get_processors_modules
 from facefusion.program import create_program
-from facefusion.program_helper import validate_args
+from facefusion.program_helper import collect_invalid_actions, validate_args
 from facefusion.types import Args, ErrorCode
 from facefusion.workflows import image_to_image, image_to_video
 
@@ -34,6 +34,8 @@ def cli() -> None:
 			else:
 				program.print_help()
 		else:
+			for argument, value, choices in collect_invalid_actions(program):
+				print(f'Invalid config value for {argument}: {value!r}. Allowed values: {", ".join(map(str, choices))}', file = sys.stderr)
 			hard_exit(2)
 	else:
 		hard_exit(2)
