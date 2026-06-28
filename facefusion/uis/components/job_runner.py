@@ -67,7 +67,6 @@ def listen() -> None:
 	JOB_RUNNER_STOP_BUTTON.click(stop, outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON ])
 	if JOB_RUNNER_TIMER:
 		JOB_RUNNER_TIMER.tick(ui_process_helper.poll_job_runner_state, outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON, JOB_RUNNER_JOB_ID_DROPDOWN ])
-		JOB_RUNNER_START_BUTTON.load(ui_process_helper.restore_job_runner_on_load, outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON, JOB_RUNNER_JOB_ID_DROPDOWN ])
 
 	ui_workflow_dropdown = get_ui_component('ui_workflow_dropdown')
 	if ui_workflow_dropdown:
