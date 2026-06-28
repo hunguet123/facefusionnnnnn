@@ -12,12 +12,14 @@ from facefusion.uis import choices as uis_choices
 from facefusion.uis.core import get_ui_component
 from facefusion.uis.types import JobRunnerAction
 from facefusion.uis.ui_helper import convert_str_none
+from facefusion.uis import ui_process_helper
 
 JOB_RUNNER_WRAPPER : Optional[gradio.Column] = None
 JOB_RUNNER_JOB_ACTION_DROPDOWN : Optional[gradio.Dropdown] = None
 JOB_RUNNER_JOB_ID_DROPDOWN : Optional[gradio.Dropdown] = None
 JOB_RUNNER_START_BUTTON : Optional[gradio.Button] = None
 JOB_RUNNER_STOP_BUTTON : Optional[gradio.Button] = None
+JOB_RUNNER_TIMER : Optional[gradio.Timer] = None
 
 
 def render() -> None:
@@ -26,6 +28,7 @@ def render() -> None:
 	global JOB_RUNNER_JOB_ID_DROPDOWN
 	global JOB_RUNNER_START_BUTTON
 	global JOB_RUNNER_STOP_BUTTON
+	global JOB_RUNNER_TIMER
 
 	if job_manager.init_jobs(state_manager.get_item('jobs_path')):
 		is_job_runner = state_manager.get_item('ui_workflow') == 'job_runner'
@@ -54,6 +57,7 @@ def render() -> None:
 					size = 'sm',
 					visible = False
 				)
+		JOB_RUNNER_TIMER = gradio.Timer(0.5, active = True)
 
 
 def listen() -> None:
@@ -61,6 +65,9 @@ def listen() -> None:
 	JOB_RUNNER_START_BUTTON.click(start, outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON ])
 	JOB_RUNNER_START_BUTTON.click(run, inputs = [ JOB_RUNNER_JOB_ACTION_DROPDOWN, JOB_RUNNER_JOB_ID_DROPDOWN ], outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON, JOB_RUNNER_JOB_ID_DROPDOWN ])
 	JOB_RUNNER_STOP_BUTTON.click(stop, outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON ])
+	if JOB_RUNNER_TIMER:
+		JOB_RUNNER_TIMER.tick(ui_process_helper.poll_job_runner_state, outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON, JOB_RUNNER_JOB_ID_DROPDOWN ])
+		JOB_RUNNER_START_BUTTON.load(ui_process_helper.restore_job_runner_on_load, outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON, JOB_RUNNER_JOB_ID_DROPDOWN ])
 
 	ui_workflow_dropdown = get_ui_component('ui_workflow_dropdown')
 	if ui_workflow_dropdown:
@@ -75,12 +82,19 @@ def remote_update(ui_workflow : UiWorkflow) -> Tuple[gradio.Row, gradio.Dropdown
 
 
 def start() -> Tuple[gradio.Button, gradio.Button]:
-	while not process_manager.is_processing():
+	while not ui_process_helper.is_background_running():
 		sleep(0.5)
 	return gradio.Button(visible = False), gradio.Button(visible = True)
 
 
 def run(job_action : JobRunnerAction, job_id : str) -> Tuple[gradio.Button, gradio.Button, gradio.Dropdown]:
+	if ui_process_helper.is_background_running():
+		return gradio.Button(visible = False), gradio.Button(visible = True), gradio.Dropdown()
+	ui_process_helper.run_in_background(run_job_action, job_action, job_id)
+	return gradio.Button(visible = False), gradio.Button(visible = True), gradio.Dropdown()
+
+
+def run_job_action(job_action : JobRunnerAction, job_id : str) -> None:
 	job_id = convert_str_none(job_id)
 
 	for key in job_store.get_job_keys():
@@ -93,8 +107,8 @@ def run(job_action : JobRunnerAction, job_id : str) -> Tuple[gradio.Button, grad
 		else:
 			logger.info(translator.get('processing_job_failed').format(job_id = job_id), __name__)
 		updated_job_ids = job_manager.find_job_ids('queued') or [ 'none' ]
-
-		return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Dropdown(value = get_last(updated_job_ids), choices = updated_job_ids)
+		ui_process_helper.set_pending_job_runner_dropdown(gradio.Dropdown(value = get_last(updated_job_ids), choices = updated_job_ids))
+		return
 
 	if job_action == 'job-run-all':
 		logger.info(translator.get('running_jobs'), __name__)
@@ -103,6 +117,7 @@ def run(job_action : JobRunnerAction, job_id : str) -> Tuple[gradio.Button, grad
 			logger.info(translator.get('processing_jobs_succeeded'), __name__)
 		else:
 			logger.info(translator.get('processing_jobs_failed'), __name__)
+		return
 
 	if job_action == 'job-retry':
 		logger.info(translator.get('retrying_job').format(job_id = job_id), __name__)
@@ -111,8 +126,8 @@ def run(job_action : JobRunnerAction, job_id : str) -> Tuple[gradio.Button, grad
 		else:
 			logger.info(translator.get('processing_job_failed').format(job_id = job_id), __name__)
 		updated_job_ids = job_manager.find_job_ids('failed') or [ 'none' ]
-
-		return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Dropdown(value = get_last(updated_job_ids), choices = updated_job_ids)
+		ui_process_helper.set_pending_job_runner_dropdown(gradio.Dropdown(value = get_last(updated_job_ids), choices = updated_job_ids))
+		return
 
 	if job_action == 'job-retry-all':
 		logger.info(translator.get('retrying_jobs'), __name__)
@@ -121,11 +136,11 @@ def run(job_action : JobRunnerAction, job_id : str) -> Tuple[gradio.Button, grad
 			logger.info(translator.get('processing_jobs_succeeded'), __name__)
 		else:
 			logger.info(translator.get('processing_jobs_failed'), __name__)
-	return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Dropdown()
 
 
 def stop() -> Tuple[gradio.Button, gradio.Button]:
 	process_manager.stop()
+	ui_process_helper.clear_active_output_path()
 	return gradio.Button(visible = True), gradio.Button(visible = False)
 
 
