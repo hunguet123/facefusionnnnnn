@@ -65,6 +65,17 @@ def listen() -> None:
 		ui_workflow_dropdown.change(remote_update, inputs = ui_workflow_dropdown, outputs = INSTANT_RUNNER_WRAPPER)
 
 
+def register_load(ui : gradio.Blocks) -> None:
+	output_image = get_ui_component('output_image')
+	output_video = get_ui_component('output_video')
+
+	if output_image and output_video and INSTANT_RUNNER_START_BUTTON and INSTANT_RUNNER_STOP_BUTTON:
+		ui.load(
+			ui_process_helper.restore_instant_runner_on_load,
+			outputs = [ INSTANT_RUNNER_START_BUTTON, INSTANT_RUNNER_STOP_BUTTON, output_image, output_video ]
+		)
+
+
 def remote_update(ui_workflow : UiWorkflow) -> gradio.Row:
 	is_instant_runner = ui_workflow == 'instant_runner'
 
@@ -106,7 +117,7 @@ def create_and_run_job(step_args : Args) -> bool:
 
 def stop() -> Tuple[gradio.Button, gradio.Button, gradio.Image, gradio.Video]:
 	process_manager.stop()
-	ui_process_helper.clear_active_output_path()
+	ui_process_helper.request_stop()
 	return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = None), gradio.Video(value = None)
 
 

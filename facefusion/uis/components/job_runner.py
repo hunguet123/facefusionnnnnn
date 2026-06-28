@@ -61,6 +61,9 @@ def render() -> None:
 
 
 def listen() -> None:
+	if not JOB_RUNNER_START_BUTTON or not JOB_RUNNER_STOP_BUTTON or not JOB_RUNNER_JOB_ID_DROPDOWN:
+		return
+
 	JOB_RUNNER_JOB_ACTION_DROPDOWN.change(update_job_action, inputs = JOB_RUNNER_JOB_ACTION_DROPDOWN, outputs = JOB_RUNNER_JOB_ID_DROPDOWN)
 	JOB_RUNNER_START_BUTTON.click(start, outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON ])
 	JOB_RUNNER_START_BUTTON.click(run, inputs = [ JOB_RUNNER_JOB_ACTION_DROPDOWN, JOB_RUNNER_JOB_ID_DROPDOWN ], outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON, JOB_RUNNER_JOB_ID_DROPDOWN ])
@@ -71,6 +74,14 @@ def listen() -> None:
 	ui_workflow_dropdown = get_ui_component('ui_workflow_dropdown')
 	if ui_workflow_dropdown:
 		ui_workflow_dropdown.change(remote_update, inputs = ui_workflow_dropdown, outputs = [ JOB_RUNNER_WRAPPER, JOB_RUNNER_JOB_ACTION_DROPDOWN, JOB_RUNNER_JOB_ID_DROPDOWN ])
+
+
+def register_load(ui : gradio.Blocks) -> None:
+	if JOB_RUNNER_START_BUTTON and JOB_RUNNER_STOP_BUTTON and JOB_RUNNER_JOB_ID_DROPDOWN:
+		ui.load(
+			ui_process_helper.restore_job_runner_on_load,
+			outputs = [ JOB_RUNNER_START_BUTTON, JOB_RUNNER_STOP_BUTTON, JOB_RUNNER_JOB_ID_DROPDOWN ]
+		)
 
 
 def remote_update(ui_workflow : UiWorkflow) -> Tuple[gradio.Row, gradio.Dropdown, gradio.Dropdown]:
@@ -139,7 +150,7 @@ def run_job_action(job_action : JobRunnerAction, job_id : str) -> None:
 
 def stop() -> Tuple[gradio.Button, gradio.Button]:
 	process_manager.stop()
-	ui_process_helper.clear_active_output_path()
+	ui_process_helper.request_stop()
 	return gradio.Button(visible = True), gradio.Button(visible = False)
 
 

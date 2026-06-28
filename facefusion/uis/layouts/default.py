@@ -121,24 +121,10 @@ def listen() -> None:
 	common_options.listen()
 
 
+def register_load(ui : gradio.Blocks) -> None:
+	instant_runner.register_load(ui)
+	job_runner.register_load(ui)
+
+
 def run(ui : gradio.Blocks) -> None:
-	from facefusion.uis import ui_process_helper
-	from facefusion.uis.components import instant_runner, job_runner
-	from facefusion.uis.core import get_ui_component
-
-	output_image = get_ui_component('output_image')
-	output_video = get_ui_component('output_video')
-
-	if output_image and output_video and instant_runner.INSTANT_RUNNER_START_BUTTON and instant_runner.INSTANT_RUNNER_STOP_BUTTON:
-		ui.load(
-			ui_process_helper.restore_instant_runner_on_load,
-			outputs = [ instant_runner.INSTANT_RUNNER_START_BUTTON, instant_runner.INSTANT_RUNNER_STOP_BUTTON, output_image, output_video ]
-		)
-
-	if job_runner.JOB_RUNNER_START_BUTTON and job_runner.JOB_RUNNER_STOP_BUTTON and job_runner.JOB_RUNNER_JOB_ID_DROPDOWN:
-		ui.load(
-			ui_process_helper.restore_job_runner_on_load,
-			outputs = [ job_runner.JOB_RUNNER_START_BUTTON, job_runner.JOB_RUNNER_STOP_BUTTON, job_runner.JOB_RUNNER_JOB_ID_DROPDOWN ]
-		)
-
 	ui.launch(favicon_path = 'facefusion.ico', inbrowser = state_manager.get_item('open_browser'))

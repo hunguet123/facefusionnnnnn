@@ -94,6 +94,12 @@ def launch() -> None:
 				ui_layout_module.render()
 				ui_layout_module.listen()
 
+		for ui_layout in state_manager.get_item('ui_layouts'):
+			ui_layout_module = load_ui_layout_module(ui_layout)
+
+			if hasattr(ui_layout_module, 'register_load'):
+				ui_layout_module.register_load(ui)
+
 	for ui_layout in state_manager.get_item('ui_layouts'):
 		ui_layout_module = load_ui_layout_module(ui_layout)
 		ui_layout_module.run(ui)
