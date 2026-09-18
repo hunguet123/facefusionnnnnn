@@ -1,5 +1,6 @@
 from typing import List
 
+from facefusion import state_manager
 from facefusion.common_helper import get_first, get_last
 from facefusion.face_creator import get_static_faces, refill_faces
 from facefusion.face_helper import calculate_bounding_box_overlap
@@ -33,6 +34,9 @@ def create_face_tracks(vision_frames : List[VisionFrame], score : Score) -> List
 
 	for frame_index, vision_frame in enumerate(vision_frames):
 		for face in get_static_faces([ vision_frame ]):
+			if not is_track_gender(face):
+				continue
+
 			face_track = select_face_track(face_tracks, face, score)
 
 			if face_track:
@@ -52,6 +56,9 @@ def select_face_track(face_tracks : List[FaceTrack], face : Face, score : Score)
 
 	for face_track in face_tracks:
 		track_face = face_track.get(get_last(face_track))
+		if not track_face or track_face.gender != face.gender:
+			continue
+
 		track_score = calculate_bounding_box_overlap(face.bounding_box, track_face.bounding_box)
 
 		if track_score > select_score:
@@ -59,3 +66,11 @@ def select_face_track(face_tracks : List[FaceTrack], face : Face, score : Score)
 			select_track = face_track
 
 	return select_track
+
+
+def is_track_gender(face : Face) -> bool:
+	face_selector_gender = state_manager.get_item('face_selector_gender')
+
+	if face_selector_gender in [ 'female', 'male' ]:
+		return face.gender == face_selector_gender
+	return True
