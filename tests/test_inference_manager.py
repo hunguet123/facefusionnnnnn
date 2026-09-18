@@ -1,10 +1,12 @@
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import pytest
 from onnxruntime import InferenceSession
 
 from facefusion import face_detector, state_manager
-from facefusion.inference_manager import INFERENCE_POOL_SET, get_inference_pool
+from facefusion.execution import resolve_cache_path
+from facefusion.inference_manager import get_inference_pool, resolve_static_inference_providers
 
 
 @pytest.fixture(scope = 'module', autouse = True)
@@ -20,14 +22,55 @@ def test_get_inference_pool() -> None:
 	model_names = [ 'retinaface' ]
 	_, model_source_set = face_detector.collect_model_downloads()
 
-	with patch('facefusion.inference_manager.detect_app_context', return_value = 'cli'):
-		get_inference_pool('facefusion.face_detector', model_names, model_source_set)
+	with patch('facefusion.inference_manager.has_execution_provider', return_value = True):
+		with patch('facefusion.inference_manager.get_onnxruntime_version', return_value = (1, 26, 0)):
 
-		assert isinstance(INFERENCE_POOL_SET.get('cli').get('facefusion.face_detector.retinaface.0.cpu').get('retinaface'), InferenceSession)
+			with patch('facefusion.inference_manager.detect_app_context', return_value = 'cli'):
+				cli_inference_pool = get_inference_pool('facefusion.face_detector', model_names, model_source_set)
 
-	with patch('facefusion.inference_manager.detect_app_context', return_value = 'ui'):
-		get_inference_pool('facefusion.face_detector', model_names, model_source_set)
+				assert isinstance(cli_inference_pool.get('retinaface'), InferenceSession)
 
-		assert isinstance(INFERENCE_POOL_SET.get('cli').get('facefusion.face_detector.retinaface.0.cpu').get('retinaface'), InferenceSession)
+			with patch('facefusion.inference_manager.detect_app_context', return_value = 'ui'):
+				ui_inference_pool = get_inference_pool('facefusion.face_detector', model_names, model_source_set)
 
-	assert INFERENCE_POOL_SET.get('cli').get('facefusion.face_detector.retinaface.0.cpu').get('retinaface') == INFERENCE_POOL_SET.get('ui').get('facefusion.face_detector.retinaface.0.cpu').get('retinaface')
+				assert isinstance(ui_inference_pool.get('retinaface'), InferenceSession)
+
+			assert not (cli_inference_pool.get('retinaface') is ui_inference_pool.get('retinaface'))
+
+	with patch('facefusion.inference_manager.get_onnxruntime_version', return_value = (1, 24, 4)):
+
+		with patch('facefusion.inference_manager.detect_app_context', return_value = 'ui'):
+			ui_inference_pool = get_inference_pool('facefusion.face_detector', model_names, model_source_set)
+
+			assert isinstance(ui_inference_pool.get('retinaface'), InferenceSession)
+
+	assert cli_inference_pool.get('retinaface') is ui_inference_pool.get('retinaface')
+
+
+@pytest.fixture
+def override_module() -> SimpleNamespace:
+	return SimpleNamespace(override_inference_providers = Mock(return_value = [ ('CoreMLExecutionProvider', { 'ModelFormat': 'MLProgram' }) ]))
+
+
+@pytest.fixture
+def adjust_module() -> SimpleNamespace:
+	return SimpleNamespace(adjust_inference_providers = Mock(return_value = [ ('CoreMLExecutionProvider', { 'ModelFormat': 'MLProgram' }) ]))
+
+
+def test_resolve_static_inference_providers(override_module : SimpleNamespace, adjust_module : SimpleNamespace) -> None:
+	state_manager.init_item('execution_providers', ['coreml'])
+	resolve_static_inference_providers.cache_clear()
+
+	with patch('facefusion.inference_manager.importlib', Mock(import_module = Mock(return_value = override_module))):
+		inference_providers = resolve_static_inference_providers('override_module', 0)
+
+		assert inference_providers == [ ('CoreMLExecutionProvider', { 'ModelFormat': 'MLProgram' }) ]
+
+	with patch('facefusion.inference_manager.importlib', Mock(import_module = Mock(return_value = adjust_module))):
+		inference_providers = resolve_static_inference_providers('adjust_module', 0)
+
+		assert inference_providers == [ ('CoreMLExecutionProvider', { 'SpecializationStrategy': 'FastPrediction', 'ModelCacheDirectory': resolve_cache_path(), 'ModelFormat': 'MLProgram' }) ]
+
+	inference_providers = resolve_static_inference_providers('test', 0)
+
+	assert inference_providers == [ ('CoreMLExecutionProvider', { 'SpecializationStrategy': 'FastPrediction', 'ModelCacheDirectory': resolve_cache_path() }) ]

@@ -6,10 +6,11 @@ import facefusion.choices
 from facefusion.filesystem import create_directory, get_file_name, is_directory, is_file, move_file, remove_directory, remove_file, resolve_file_pattern
 from facefusion.jobs.job_helper import get_step_output_path
 from facefusion.json import read_json, write_json
+from facefusion.sanitizer import sanitize_job_id
 from facefusion.time_helper import get_current_date_time
 from facefusion.types import Args, Job, JobSet, JobStatus, JobStep, JobStepStatus
 
-JOBS_PATH : Optional[str] = None
+JOBS_PATH : str = '.jobs'
 
 
 def init_jobs(jobs_path : str) -> bool:
@@ -261,5 +262,6 @@ def find_job_path(job_id : str) -> Optional[str]:
 
 def get_job_file_name(job_id : str) -> Optional[str]:
 	if job_id:
+		job_id = sanitize_job_id(job_id)
 		return job_id + '.json'
 	return None
