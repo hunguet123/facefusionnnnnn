@@ -1,6 +1,5 @@
 import io
 import logging
-import math
 import os
 from typing import Optional
 
@@ -66,20 +65,14 @@ def tqdm_update(self : tqdm, n : int = 1) -> None:
 
 
 def create_tqdm_output(self : tqdm) -> Optional[str]:
-	if not self.disable and self.desc and self.total:
-		percentage = math.floor(self.n / self.total * 100)
-		output = self.desc + translator.get('colon') + ' ' + str(percentage) + '% (' + str(self.n) + '/' + str(self.total) + ')'
-		rate = self.format_dict.get('rate')
-		remaining = self.format_dict.get('remaining')
+	if self.disable:
+		return None
 
-		if rate:
-			output += ' ' + str(round(rate, 2)) + 'frame/s'
-		if remaining is not None:
-			output += ' ETA ' + tqdm.format_interval(remaining)
-		return output
-	if not self.disable and self.desc and self.unit:
-		return self.desc + translator.get('colon') + ' ' + str(self.n) + ' ' + self.unit
-	return None
+	format_dict = dict(self.format_dict)
+	format_dict['ncols'] = 100
+	format_dict['colour'] = None
+	format_dict['bar_format'] = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]'
+	return self.format_meter(**format_dict).strip() or None
 
 
 def read_logs() -> str:
