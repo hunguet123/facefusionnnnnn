@@ -68,7 +68,15 @@ def tqdm_update(self : tqdm, n : int = 1) -> None:
 def create_tqdm_output(self : tqdm) -> Optional[str]:
 	if not self.disable and self.desc and self.total:
 		percentage = math.floor(self.n / self.total * 100)
-		return self.desc + translator.get('colon') + ' ' + str(percentage) + '% (' + str(self.n) + '/' + str(self.total) + ')'
+		output = self.desc + translator.get('colon') + ' ' + str(percentage) + '% (' + str(self.n) + '/' + str(self.total) + ')'
+		rate = self.format_dict.get('rate')
+		remaining = self.format_dict.get('remaining')
+
+		if rate:
+			output += ' ' + str(round(rate, 2)) + 'frame/s'
+		if remaining is not None:
+			output += ' ETA ' + tqdm.format_interval(remaining)
+		return output
 	if not self.disable and self.desc and self.unit:
 		return self.desc + translator.get('colon') + ' ' + str(self.n) + ' ' + self.unit
 	return None
