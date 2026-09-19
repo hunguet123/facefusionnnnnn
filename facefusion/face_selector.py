@@ -1,13 +1,18 @@
-from typing import List
+import threading
+from typing import Dict, List, Optional
 
 import numpy
 
 import facefusion.choices
-from facefusion import state_manager
+from facefusion import logger, state_manager
 from facefusion.common_helper import get_first, get_middle
 from facefusion.face_creator import get_one_face, get_static_faces
 from facefusion.face_tracker import track_faces
 from facefusion.types import Face, FaceSelectorOrder, Gender, Race, Score, VisionFrame
+from facefusion.vision import read_static_images, read_static_video_frame, read_video_frame, restrict_trim_frame
+
+REFERENCE_RESOLVE_LOCK = threading.Lock()
+RESOLVED_REFERENCE_FRAMES : Dict[str, Optional[VisionFrame]] = {}
 
 
 def select_faces(reference_vision_frame : VisionFrame, source_vision_frames : List[VisionFrame], target_vision_frames : List[VisionFrame]) -> List[Face]:
@@ -36,6 +41,51 @@ def select_faces(reference_vision_frame : VisionFrame, source_vision_frames : Li
 			return match_faces
 
 	return []
+
+
+def has_reference_face(vision_frame : Optional[VisionFrame]) -> bool:
+	if vision_frame is None or not numpy.any(vision_frame) or float(numpy.mean(vision_frame)) < 8:
+		return False
+
+	source_faces = get_static_faces(read_static_images(state_manager.get_item('source_paths')))
+	reference_faces = sort_and_filter_faces(source_faces, get_static_faces([ vision_frame ]))
+	return get_one_face(reference_faces, state_manager.get_item('reference_face_position')) is not None
+
+
+def resolve_reference_vision_frame() -> Optional[VisionFrame]:
+	target_path = state_manager.get_item('target_path')
+	resolved_frame = RESOLVED_REFERENCE_FRAMES.get(target_path)
+
+	if target_path in RESOLVED_REFERENCE_FRAMES:
+		return resolved_frame
+
+	with REFERENCE_RESOLVE_LOCK:
+		if target_path in RESOLVED_REFERENCE_FRAMES:
+			return RESOLVED_REFERENCE_FRAMES.get(target_path)
+
+		frame_number = state_manager.get_item('reference_frame_number')
+		vision_frame = read_static_video_frame(target_path, frame_number)
+
+		if has_reference_face(vision_frame):
+			RESOLVED_REFERENCE_FRAMES[target_path] = vision_frame
+			return vision_frame
+
+		trim_frame_start, trim_frame_end = restrict_trim_frame(target_path, state_manager.get_item('trim_frame_start'), state_manager.get_item('trim_frame_end'))
+		scan_start = max(frame_number + 1, trim_frame_start)
+		scan_step = 15
+
+		for candidate_number in range(scan_start, trim_frame_end, scan_step):
+			candidate_frame = read_video_frame(target_path, candidate_number)
+
+			if has_reference_face(candidate_frame):
+				state_manager.set_item('reference_frame_number', candidate_number)
+				RESOLVED_REFERENCE_FRAMES[target_path] = candidate_frame
+				logger.info('reference frame ' + str(frame_number) + ' has no face, using frame ' + str(candidate_number), __name__)
+				return candidate_frame
+
+		logger.warn('reference frame ' + str(frame_number) + ' has no face, no later frame matched', __name__)
+		RESOLVED_REFERENCE_FRAMES[target_path] = vision_frame
+		return vision_frame
 
 
 def find_match_faces(reference_faces : List[Face], target_faces : List[Face], face_distance : float) -> List[Face]:

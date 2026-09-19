@@ -9,6 +9,7 @@ from facefusion.filesystem import filter_audio_paths
 from facefusion.processors.core import get_processors_modules
 from facefusion.temp_helper import clear_temp_directory, create_temp_directory
 from facefusion.types import AudioFrame, ErrorCode, VisionFrame
+from facefusion.face_selector import resolve_reference_vision_frame
 from facefusion.vision import conditional_merge_vision_mask, detect_video_fps, extract_vision_mask, read_static_image, read_static_images, read_static_video_frame, resolve_extract_frame_number, resolve_target_frame_number, restrict_trim_frame, restrict_video_fps, select_video_frames
 
 
@@ -33,6 +34,8 @@ def clear() -> ErrorCode:
 
 def conditional_get_reference_vision_frame() -> VisionFrame:
 	if state_manager.get_item('workflow_mode') == 'image-to-video':
+		if state_manager.get_item('face_selector_mode') == 'reference':
+			return resolve_reference_vision_frame()
 		return read_static_video_frame(state_manager.get_item('target_path'), state_manager.get_item('reference_frame_number'))
 	return read_static_image(state_manager.get_item('target_path'))
 
