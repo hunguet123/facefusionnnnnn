@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Tuple
 from unittest.mock import Mock, patch
 
 import pytest
@@ -6,7 +7,7 @@ from onnxruntime import InferenceSession
 
 from facefusion import face_detector, state_manager
 from facefusion.execution import resolve_cache_path
-from facefusion.inference_manager import get_inference_pool, resolve_static_inference_providers
+from facefusion.inference_manager import clear_inference_pool, get_inference_pool, resolve_static_inference_providers
 
 
 @pytest.fixture(scope = 'module', autouse = True)
@@ -18,33 +19,32 @@ def before_all() -> None:
 	face_detector.pre_check()
 
 
-def test_get_inference_pool() -> None:
+@pytest.mark.parametrize('onnxruntime_version, is_shared',
+[
+	((1, 25, 1), True),
+	((1, 26, 0), False),
+	((1, 27, 0), False),
+	((1, 28, 0), False),
+	((1, 29, 0), True)
+])
+def test_get_inference_pool(onnxruntime_version : Tuple[int, int, int], is_shared : bool) -> None:
 	model_names = [ 'retinaface' ]
 	_, model_source_set = face_detector.collect_model_downloads()
 
 	with patch('facefusion.inference_manager.has_execution_provider', return_value = True):
-		with patch('facefusion.inference_manager.get_onnxruntime_version', return_value = (1, 26, 0)):
+		with patch('facefusion.inference_manager.get_onnxruntime_version', return_value = onnxruntime_version):
+			with patch('facefusion.inference_manager.detect_app_context', return_value = 'ui'):
+				clear_inference_pool('facefusion.face_detector', model_names)
 
 			with patch('facefusion.inference_manager.detect_app_context', return_value = 'cli'):
+				clear_inference_pool('facefusion.face_detector', model_names)
 				cli_inference_pool = get_inference_pool('facefusion.face_detector', model_names, model_source_set)
-
-				assert isinstance(cli_inference_pool.get('retinaface'), InferenceSession)
 
 			with patch('facefusion.inference_manager.detect_app_context', return_value = 'ui'):
 				ui_inference_pool = get_inference_pool('facefusion.face_detector', model_names, model_source_set)
 
-				assert isinstance(ui_inference_pool.get('retinaface'), InferenceSession)
-
-			assert not (cli_inference_pool.get('retinaface') is ui_inference_pool.get('retinaface'))
-
-	with patch('facefusion.inference_manager.get_onnxruntime_version', return_value = (1, 24, 4)):
-
-		with patch('facefusion.inference_manager.detect_app_context', return_value = 'ui'):
-			ui_inference_pool = get_inference_pool('facefusion.face_detector', model_names, model_source_set)
-
-			assert isinstance(ui_inference_pool.get('retinaface'), InferenceSession)
-
-	assert cli_inference_pool.get('retinaface') is ui_inference_pool.get('retinaface')
+	assert isinstance(cli_inference_pool.get('retinaface'), InferenceSession)
+	assert (cli_inference_pool.get('retinaface') is ui_inference_pool.get('retinaface')) == is_shared
 
 
 @pytest.fixture
